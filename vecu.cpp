@@ -1,30 +1,44 @@
 #define _GNU_SOURCE
 #include <dlfcn.h>
 #include <iostream>
+#include <thread>
 #include <cstdlib>
 
-extern "C" void vecu_func() {
-    std::cout << "[vecu] Loading vecutasks.so with dlmopen and RTLD_DEEPBIND\n";
-    // In vecu.cpp
-    void* vecutasks = dlmopen(LM_ID_NEWLM, "./vecutasks.so", RTLD_DEEPBIND | RTLD_NOW);
-    // void* vecutasks = dlopen("./vecutasks.so", RTLD_NOW);
-    if (!vecutasks) {
-        std::cerr << "dlmopen vecutasks.so failed: " << dlerror() << std::endl;
-        std::exit(1);
-    }
-    std::cout << "[vecu] vecutasks.so loaded in new namespace\n";
+extern volatile uint32_t T10Counter;
+volatile uint32_t T10Counter = 0;
 
-    using FuncType = void(*)();
-    FuncType vecutasks_func = reinterpret_cast<FuncType>(dlsym(vecutasks, "vecutasks_func"));
-    if (!vecutasks_func) {
-        std::cerr << "dlsym vecutasks_func failed: " << dlerror() << std::endl;
-        std::exit(1);
-    }
+typedef void (*fptr_initialize)();
+typedef int (*main_ptr)(int argc, const char *argv[]);
+typedef void (*fptr_terminate)();
 
-    std::cout << "[vecu] Calling vecutasks_func...\n";
-    vecutasks_func();
+fptr_initialize init = 0;
+main_ptr main_dll = 0;
+fptr_terminate terminate = 0;
+
+extern "C" void vecu_func() 
+{   
+    void* vecutasks = dlopen("./libvECUTasks.so", RTLD_NOW);
+
+    init = (fptr_initialize)dlsym(vecutasks, "initializeDirectMode");
+    main_dll = (main_ptr)dlsym(vecutasks, "main");
+    terminate = (fptr_terminate)dlsym(vecutasks, "terminateDirectMode");
+
+    T10Counter++;
+
+    std::cout << "Taskcounter value: " << T10Counter << std::endl;
     
-    dlclose(vecutasks);
-    char *msg = dlerror();
-    std::cout << msg;
+        // std::thread t(
+        //     [&]()
+        //     {
+        //         const char *argv[1];
+        //         argv[0] = "ProjectName.vrta_ecu";
+        //         main_dll(1, const_cast<const char **>(argv));
+        //     });
+        // t.detach();
+        
+        // init();
+    
+    std::cout << " " << dlclose(vecutasks) << std::endl;
+
+    
 }
